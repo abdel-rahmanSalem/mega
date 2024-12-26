@@ -6,7 +6,7 @@ import java.io.IOException;
 
 public class Message {
     private int correlationId;
-    private byte messageType;
+    private MessageType messageType;
     private String topic;
     private long timestamp;
     private byte[] payload;
@@ -23,7 +23,8 @@ public class Message {
         correlationId = dataInputStream.readInt();
 
         // Parse Message Type (1 byte)
-        messageType = dataInputStream.readByte();
+        byte messageTypeCode = dataInputStream.readByte();
+        messageType = MessageType.fromCode(messageTypeCode);
 
         // Parse Topic (String)
         int topicLength = dataInputStream.readInt();
@@ -45,7 +46,7 @@ public class Message {
         return correlationId;
     }
 
-    public byte getMessageType() {
+    public MessageType getMessageType() {
         return messageType;
     }
 
