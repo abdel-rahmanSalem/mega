@@ -1,0 +1,33 @@
+# Ignore Gradle project-specific cache directory
+.gradle/
+
+# Ignore Gradle build output directory
+/build/
+
+# Ignore all IDE-specific files
+.vscode/
+.idea/
+
+# Ignore local configuration files
+*.iml
+
+# Ignore any log files
+*.log
+
+# Ignore any temporary files
+*.tmp
+
+# Ignore compiled class files
+*.class
+
+# Ignore JAR files
+*.jar
+
+# Ignore compiled test class files
+*.test
+
+# Ignore the gradle wrapper jars
+gradle-wrapper.jar
+
+# Ignore the gradle wrapper properties file (for Windows/Mac specific)
+gradle-wrapper.properties
