@@ -1,17 +1,18 @@
 package mega;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Server {
     private final int port;
+    private final ExecutorService executorService;
 
-    Server(int port) {
+    public Server(int port, int poolSize) {
         this.port = port;
+        this.executorService = Executors.newFixedThreadPool(poolSize);
     }
 
     public void start() {
@@ -22,39 +23,15 @@ public class Server {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("Client connected: " + clientSocket.getInetAddress());
 
-                // Pass the client socket to ProtocolHandler
-                new Thread(() -> handleClient(clientSocket)).start();
+                // Handle client connection in a separate thread
+                executorService.submit(new ClientHandler(clientSocket));
             }
-        } catch (Exception e) {
-            System.err.println("Error in Server: " + e.getMessage());
+        } catch (IOException e) {
+            System.err.println("Error in server: " + e.getMessage());
         }
     }
 
-    private void handleClient(Socket clientSocket) {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                OutputStream writer = clientSocket.getOutputStream()) {
-
-            // Send a welcome message to the client
-            writer.write("Welcome to the server!\n".getBytes());
-            writer.flush();
-
-            // Now listen for messages from the client
-            String clientMessage;
-            while ((clientMessage = reader.readLine()) != null) {
-                System.out.println("Received from client: " + clientMessage);
-
-                // Respond to the client (Echoing back the received message)
-                writer.write(("You said: " + clientMessage + "\n").getBytes());
-                writer.flush();
-            }
-        } catch (IOException e) {
-            System.err.println("Error handling client: " + e.getMessage());
-        } finally {
-            try {
-                clientSocket.close();
-            } catch (IOException e) {
-                System.err.println("Error closing client connection: " + e.getMessage());
-            }
-        }
+    public void stop() {
+        executorService.shutdown();
     }
 }

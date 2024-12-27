@@ -1,6 +1,5 @@
 package mega;
 
-import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 
@@ -11,13 +10,11 @@ public class Message {
     private long timestamp;
     private byte[] payload;
 
-    public Message(byte[] rawData) throws IOException {
-        parseMessage(rawData);
+    public Message(DataInputStream dataInputStream) throws IOException {
+        parseMessage(dataInputStream);
     }
 
-    private void parseMessage(byte[] rawData) throws IOException {
-        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(rawData);
-        DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
+    private void parseMessage(DataInputStream dataInputStream) throws IOException {
 
         // Parse Correlation ID (4 bytes)
         correlationId = dataInputStream.readInt();
@@ -65,7 +62,7 @@ public class Message {
     // String representation for testing
     @Override
     public String toString() {
-        return "Message{" +
+        return "{" +
                 "correlationId=" + correlationId +
                 ", messageType=" + messageType +
                 ", topic='" + topic + '\'' +

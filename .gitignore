@@ -3,6 +3,7 @@
 
 # Ignore Gradle build output directory
 /build/
+app/build/
 
 # Ignore all IDE-specific files
 .vscode/
@@ -11,10 +12,10 @@
 # Ignore local configuration files
 *.iml
 
-# Ignore any log files
+# Ignore log files
 *.log
 
-# Ignore any temporary files
+# Ignore temporary files
 *.tmp
 
 # Ignore compiled class files
@@ -23,11 +24,14 @@
 # Ignore JAR files
 *.jar
 
-# Ignore compiled test class files
-*.test
+# Ignore binary output files
+*.bin
+*.bin.idx
 
-# Ignore the gradle wrapper jars
-gradle-wrapper.jar
+# Python cache
+__pycache__/
+*.pyc
+*.py
 
-# Ignore the gradle wrapper properties file (for Windows/Mac specific)
-gradle-wrapper.properties
+*.war
+*.zip
