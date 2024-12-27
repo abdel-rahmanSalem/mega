@@ -8,6 +8,7 @@ public class Message {
     private MessageType messageType;
     private String topic;
     private long timestamp;
+    private int offset = -1; // Default -1 for non-Consume messages
     private byte[] payload;
 
     public Message(DataInputStream dataInputStream) throws IOException {
@@ -32,6 +33,11 @@ public class Message {
         // Parse Timestamp (8 bytes)
         timestamp = dataInputStream.readLong();
 
+        // Parse Offset (4 bytes, for Consume messages)
+        if (messageType == MessageType.CONSUME) {
+            offset = dataInputStream.readInt();
+        }
+
         // Parse Payload (remaining bytes)
         int payloadLength = dataInputStream.readInt();
         payload = new byte[payloadLength];
@@ -55,6 +61,10 @@ public class Message {
         return timestamp;
     }
 
+    public int getOffset() {
+        return offset;
+    }
+
     public byte[] getPayload() {
         return payload;
     }
@@ -67,6 +77,7 @@ public class Message {
                 ", messageType=" + messageType +
                 ", topic='" + topic + '\'' +
                 ", timestamp=" + timestamp +
+                ", offset=" + offset +
                 ", payload=" + new String(payload) +
                 '}';
     }
