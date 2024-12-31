@@ -107,6 +107,9 @@ public class ClientHandler implements Runnable, AutoCloseable {
             broker.createTopic(message.getTopic());
             sendCreateTopicResponse(message.getCorrelationId(), true, message.getTimestamp(), message.getTopic());
             logInfo("Topic created successfully: " + message.getTopic());
+        } catch (TopicAlreadyExistsException e) {
+            logInfo("Topic already exists: " + message.getTopic());
+            sendErrorResponse(message.getCorrelationId(), ErrorCode.TOPIC_ALREADY_EXISTS);
         } catch (Exception e) {
             handleError("Failed to create topic: " + message.getTopic(), e);
             sendErrorResponse(message.getCorrelationId(), ErrorCode.INTERNAL_ERROR);

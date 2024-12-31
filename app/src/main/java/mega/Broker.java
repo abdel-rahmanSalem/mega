@@ -31,7 +31,7 @@ public class Broker {
         try {
             System.out.println("[Broker] Attempting to create topic: " + topicName);
             if (topics.containsKey(topicName)) {
-                throw new IllegalStateException("Topic already exists: " + topicName);
+                throw new TopicAlreadyExistsException("Topic already exists: " + topicName);
             }
             topics.computeIfAbsent(topicName, name -> {
                 try {

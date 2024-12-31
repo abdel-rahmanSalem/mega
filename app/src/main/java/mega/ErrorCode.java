@@ -1,14 +1,15 @@
 package mega;
 
 public enum ErrorCode {
-    TOPIC_NOT_FOUND((byte) 1),
-    INVALID_OFFSET((byte) 2),
-    INTERNAL_ERROR((byte) 3),
-    INVALID_MESSAGE_TYPE((byte) 4),
-    NETWORK_ERROR((byte) 5),
-    MESSAGE_TOO_LARGE((byte) 6),
-    INVALID_REQUEST((byte) 7),
-    RESOURCE_EXHAUSTED((byte) 8);
+    INVALID_REQUEST((byte) 1),
+    INVALID_MESSAGE_TYPE((byte) 2),
+    MESSAGE_TOO_LARGE((byte) 3),
+    TOPIC_NOT_FOUND((byte) 4),
+    TOPIC_ALREADY_EXISTS((byte) 5),
+    INVALID_OFFSET((byte) 6),
+    INTERNAL_ERROR((byte) 7),
+    NETWORK_ERROR((byte) 8),
+    RESOURCE_EXHAUSTED((byte) 9);
 
     private final byte code;
 
