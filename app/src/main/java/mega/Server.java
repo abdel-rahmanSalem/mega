@@ -64,6 +64,7 @@ public class Server implements AutoCloseable {
         } catch (IOException | InterruptedException e) {
             System.err.println("[Server] Error during server shutdown: " + e.getMessage());
             executorService.shutdownNow();
+            running = false; // Reset the running flag
         }
     }
 }

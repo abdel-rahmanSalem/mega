@@ -8,6 +8,7 @@ public class Broker {
     private final Map<String, Topic> topics = new ConcurrentHashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     private static volatile Broker instance;
+    private static final int MAX_TOPIC_NAME_LENGTH = 255;
 
     private Broker() {
         System.out.println("[Broker] Initializing broker instance");
@@ -25,13 +26,35 @@ public class Broker {
     }
 
     public void createTopic(String topicName) {
+        validateTopicName(topicName);
         lock.writeLock().lock();
         try {
             System.out.println("[Broker] Attempting to create topic: " + topicName);
-            topics.computeIfAbsent(topicName, Topic::new);
+            if (topics.containsKey(topicName)) {
+                throw new IllegalStateException("Topic already exists: " + topicName);
+            }
+            topics.computeIfAbsent(topicName, name -> {
+                try {
+                    return new Topic(name);
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to create topic: " + name, e);
+                }
+            });
             System.out.println("[Broker] Topic created successfully: " + topicName);
         } finally {
             lock.writeLock().unlock();
+        }
+    }
+
+    private void validateTopicName(String topicName) {
+        if (topicName == null || topicName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Topic name cannot be null or empty");
+        }
+        if (topicName.length() > MAX_TOPIC_NAME_LENGTH) {
+            throw new IllegalArgumentException("Topic name exceeds maximum length of " + MAX_TOPIC_NAME_LENGTH);
+        }
+        if (!topicName.matches("^[a-zA-Z0-9._-]+$")) {
+            throw new IllegalArgumentException("Topic name contains invalid characters");
         }
     }
 
@@ -47,6 +70,9 @@ public class Broker {
             int offset = topic.produce(message);
             System.out.println("[Broker] Message produced successfully at offset: " + offset);
             return offset;
+        } catch (Exception e) {
+            System.err.println("[Broker] Error producing message: " + e.getMessage());
+            throw e;
         } finally {
             lock.readLock().unlock();
         }

@@ -12,13 +12,16 @@ public class ClientHandler implements Runnable, AutoCloseable {
     private DataInputStream input;
     private DataOutputStream output;
     private final String clientId;
+    private static final int READ_TIMEOUT_MS = 30000; // 30 seconds
+    // private static final int WRITE_TIMEOUT_MS = 30000; // 30 seconds
+    private static final int MAX_MESSAGE_SIZE = 1024 * 1024; // 1MB
 
     public ClientHandler(Socket clientSocket) {
         this.clientSocket = clientSocket;
         this.broker = Broker.getInstance();
         this.running = new AtomicBoolean(true);
         this.clientId = clientSocket.getInetAddress() + ":" + clientSocket.getPort();
-        System.out.println("[ClientHandler] New client connected: " + clientId);
+        logInfo("New client connected");
     }
 
     @Override
@@ -34,24 +37,28 @@ public class ClientHandler implements Runnable, AutoCloseable {
     }
 
     private void initializeStreams() throws IOException {
-        System.out.println("[ClientHandler] Initializing streams for client: " + clientId);
-        input = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
-        output = new DataOutputStream(new BufferedOutputStream(clientSocket.getOutputStream()));
+        logInfo("Initializing streams for client");
+        try {
+            clientSocket.setSoTimeout(READ_TIMEOUT_MS);
+            input = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
+            output = new DataOutputStream(new BufferedOutputStream(clientSocket.getOutputStream()));
+        } catch (IOException e) {
+            handleError("Failed to initialize streams", e);
+            throw e;
+        }
     }
 
     private void handleClientRequests() throws IOException {
         while (running.get()) {
             try {
                 Message message = new Message(input);
-                System.out.printf("[ClientHandler] Received message from client %s: %s%n",
-                        clientId, message);
+                logInfo("Received message: " + message);
                 processMessage(message);
             } catch (EOFException e) {
-                System.out.printf("[ClientHandler] Client disconnected: %s%n", clientId);
+                logInfo("Client disconnected");
                 break;
             } catch (IOException e) {
-                System.err.printf("[ClientHandler] Network error with client %s: %s%n",
-                        clientId, e.getMessage());
+                handleError("Network error", e);
                 sendErrorResponse(0, ErrorCode.NETWORK_ERROR);
                 break;
             }
@@ -59,6 +66,12 @@ public class ClientHandler implements Runnable, AutoCloseable {
     }
 
     private void processMessage(Message message) throws IOException {
+        if (message.getPayloadLength() > MAX_MESSAGE_SIZE) {
+            handleError("Message size exceeds maximum allowed size", null);
+            sendErrorResponse(message.getCorrelationId(), ErrorCode.MESSAGE_TOO_LARGE);
+            return;
+        }
+
         try {
             switch (message.getMessageType()) {
                 case CREATE_TOPIC:
@@ -75,10 +88,16 @@ public class ClientHandler implements Runnable, AutoCloseable {
             }
             output.flush();
         } catch (TopicNotFoundException e) {
-            System.out.println("[ClientHandler] Topic not found for client " + clientId + ": " + e.getMessage());
+            handleError("Topic not found: " + message.getTopic(), e);
             sendErrorResponse(message.getCorrelationId(), ErrorCode.TOPIC_NOT_FOUND);
+        } catch (IllegalArgumentException e) {
+            handleError("Invalid request", e);
+            sendErrorResponse(message.getCorrelationId(), ErrorCode.INVALID_REQUEST);
+        } catch (IllegalStateException e) {
+            handleError("Resource exhausted", e);
+            sendErrorResponse(message.getCorrelationId(), ErrorCode.RESOURCE_EXHAUSTED);
         } catch (Exception e) {
-            handleError("Error processing message for client " + clientId, e);
+            handleError("Error processing message", e);
             sendErrorResponse(message.getCorrelationId(), ErrorCode.INTERNAL_ERROR);
         }
     }
@@ -87,9 +106,9 @@ public class ClientHandler implements Runnable, AutoCloseable {
         try {
             broker.createTopic(message.getTopic());
             sendCreateTopicResponse(message.getCorrelationId(), true, message.getTimestamp(), message.getTopic());
+            logInfo("Topic created successfully: " + message.getTopic());
         } catch (Exception e) {
-            System.err.printf("[ClientHandler] Failed to create topic %s - Client: %s - Error: %s%n",
-                    message.getTopic(), clientId, e.getMessage());
+            handleError("Failed to create topic: " + message.getTopic(), e);
             sendErrorResponse(message.getCorrelationId(), ErrorCode.INTERNAL_ERROR);
         }
     }
@@ -98,13 +117,12 @@ public class ClientHandler implements Runnable, AutoCloseable {
         try {
             int offset = broker.produce(message.getTopic(), message);
             sendProduceResponse(message.getCorrelationId(), true, message.getTimestamp(), offset);
+            logInfo("Message produced successfully at offset: " + offset);
         } catch (TopicNotFoundException e) {
-            System.err.printf("[ClientHandler] Topic not found %s - Client: %s%n",
-                    message.getTopic(), clientId);
+            handleError("Topic not found for produce: " + message.getTopic(), e);
             sendErrorResponse(message.getCorrelationId(), ErrorCode.TOPIC_NOT_FOUND);
         } catch (Exception e) {
-            System.err.printf("[ClientHandler] Failed to produce message - Client: %s - Error: %s%n",
-                    clientId, e.getMessage());
+            handleError("Failed to produce message", e);
             sendErrorResponse(message.getCorrelationId(), ErrorCode.INTERNAL_ERROR);
         }
     }
@@ -113,23 +131,24 @@ public class ClientHandler implements Runnable, AutoCloseable {
         try {
             Message msg = broker.consume(message.getTopic(), message.getOffset());
             if (msg == null) {
+                handleError("Invalid offset: " + message.getOffset(), null);
                 sendErrorResponse(message.getCorrelationId(), ErrorCode.INVALID_OFFSET);
                 return;
             }
             sendConsumeResponse(message.getCorrelationId(), true, message.getOffset(),
                     msg.getTimestamp(), msg.getPayload().length, msg.getPayload());
+            logInfo("Message consumed successfully from offset: " + message.getOffset());
         } catch (TopicNotFoundException e) {
-            System.err.printf("[ClientHandler] Topic not found %s - Client: %s%n",
-                    message.getTopic(), clientId);
+            handleError("Topic not found for consume: " + message.getTopic(), e);
             sendErrorResponse(message.getCorrelationId(), ErrorCode.TOPIC_NOT_FOUND);
         } catch (Exception e) {
-            System.err.printf("[ClientHandler] Failed to consume message - Client: %s - Error: %s%n",
-                    clientId, e.getMessage());
+            handleError("Failed to consume message", e);
             sendErrorResponse(message.getCorrelationId(), ErrorCode.INTERNAL_ERROR);
         }
     }
 
     private void handleUnknownMessageType(Message message) throws IOException {
+        handleError("Unknown message type: " + message.getMessageType(), null);
         sendErrorResponse(message.getCorrelationId(), ErrorCode.INVALID_MESSAGE_TYPE);
     }
 
@@ -163,32 +182,55 @@ public class ClientHandler implements Runnable, AutoCloseable {
     }
 
     private void sendErrorResponse(int correlationId, ErrorCode errorCode) throws IOException {
-        new ErrorResponse(correlationId, errorCode).writeTo(output);
-        output.flush();
-
-        System.err.printf("[ClientHandler] Error occurred - Client: %s, CorrelationId: %d, ErrorCode: %s%n",
-                clientId, correlationId, errorCode);
+        try {
+            new ErrorResponse(correlationId, errorCode).writeTo(output);
+            output.flush();
+            handleError("Sent error response", null);
+        } catch (IOException e) {
+            handleError("Failed to send error response", e);
+            throw e;
+        }
     }
 
     private void handleError(String message, Exception e) {
-        System.err.println("[ClientHandler] " + message + " - Client: " + clientId);
-        System.err.println("[ClientHandler] Error details: " + e.getMessage());
+        String errorMessage = String.format("[ClientHandler] %s - Client: %s", message, clientId);
+        if (e != null) {
+            System.err.println(errorMessage + " - Error: " + e.getMessage());
+            e.printStackTrace();
+        } else {
+            System.err.println(errorMessage);
+        }
+    }
+
+    private void logInfo(String message) {
+        System.out.println(String.format("[ClientHandler] %s - Client: %s", message, clientId));
     }
 
     @Override
     public void close() {
-        System.out.println("[ClientHandler] Closing connection for client: " + clientId);
+        logInfo("Closing connection");
         running.set(false);
-        try {
-            if (input != null)
-                input.close();
-            if (output != null)
-                output.close();
-            if (clientSocket != null)
-                clientSocket.close();
-        } catch (IOException e) {
-            System.err
-                    .println("[ClientHandler] Error closing resources for client " + clientId + ": " + e.getMessage());
+
+        if (output != null) {
+            try {
+                output.flush();
+            } catch (IOException e) {
+                handleError("Error flushing output stream", e);
+            }
+        }
+
+        closeQuietly(input, "input stream");
+        closeQuietly(output, "output stream");
+        closeQuietly(clientSocket, "client socket");
+    }
+
+    private void closeQuietly(AutoCloseable resource, String resourceName) {
+        if (resource != null) {
+            try {
+                resource.close();
+            } catch (Exception e) {
+                handleError("Error closing " + resourceName, e);
+            }
         }
     }
 }

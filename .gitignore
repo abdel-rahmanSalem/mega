@@ -31,7 +31,7 @@ app/build/
 # Python cache
 __pycache__/
 *.pyc
-*.py
+# *.py
 
 *.war
 *.zip
