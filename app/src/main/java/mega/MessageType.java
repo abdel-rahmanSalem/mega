@@ -2,7 +2,8 @@ package mega;
 
 public enum MessageType {
     PRODUCE((byte) 0x01), // Produce message
-    CONSUME((byte) 0x02); // Consume message
+    CONSUME((byte) 0x02), // Consume message
+    CREATE_TOPIC((byte) 0x03);
 
     private final byte code;
 

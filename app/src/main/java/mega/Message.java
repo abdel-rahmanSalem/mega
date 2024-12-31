@@ -9,6 +9,7 @@ public class Message {
     private String topic;
     private long timestamp;
     private int offset = -1; // Default -1 for non-Consume messages
+    private int payloadLength = -1;
     private byte[] payload;
 
     public Message(DataInputStream dataInputStream) throws IOException {
@@ -18,67 +19,71 @@ public class Message {
     private void parseMessage(DataInputStream dataInputStream) throws IOException {
 
         // Parse Correlation ID (4 bytes)
-        correlationId = dataInputStream.readInt();
+        this.correlationId = dataInputStream.readInt();
 
         // Parse Message Type (1 byte)
         byte messageTypeCode = dataInputStream.readByte();
-        messageType = MessageType.fromCode(messageTypeCode);
+        this.messageType = MessageType.fromCode(messageTypeCode);
 
         // Parse Topic (String)
         int topicLength = dataInputStream.readInt();
         byte[] topicBytes = new byte[topicLength];
         dataInputStream.readFully(topicBytes);
-        topic = new String(topicBytes);
+        this.topic = new String(topicBytes);
 
         // Parse Timestamp (8 bytes)
-        timestamp = dataInputStream.readLong();
+        this.timestamp = dataInputStream.readLong();
 
         // Parse Offset (4 bytes, for Consume messages)
-        if (messageType == MessageType.CONSUME) {
-            offset = dataInputStream.readInt();
+        if (this.messageType == MessageType.CONSUME) {
+            this.offset = dataInputStream.readInt();
         }
 
         // Parse Payload (remaining bytes)
-        int payloadLength = dataInputStream.readInt();
-        payload = new byte[payloadLength];
-        dataInputStream.readFully(payload);
+        this.payloadLength = dataInputStream.readInt();
+        this.payload = new byte[payloadLength];
+        dataInputStream.readFully(this.payload);
     }
 
     // Getters
     public int getCorrelationId() {
-        return correlationId;
+        return this.correlationId;
     }
 
     public MessageType getMessageType() {
-        return messageType;
+        return this.messageType;
     }
 
     public String getTopic() {
-        return topic;
+        return this.topic;
     }
 
     public long getTimestamp() {
-        return timestamp;
+        return this.timestamp;
     }
 
     public int getOffset() {
-        return offset;
+        return this.offset;
+    }
+
+    public int getPayloadLength() {
+        return this.payloadLength;
     }
 
     public byte[] getPayload() {
-        return payload;
+        return this.payload;
     }
 
     // String representation for testing
     @Override
     public String toString() {
         return "{" +
-                "correlationId=" + correlationId +
-                ", messageType=" + messageType +
-                ", topic='" + topic + '\'' +
-                ", timestamp=" + timestamp +
-                ", offset=" + offset +
-                ", payload=" + new String(payload) +
+                "correlationId=" + getCorrelationId() +
+                ", messageType=" + getMessageType() +
+                ", topic='" + getTopic() + '\'' +
+                ", timestamp=" + getTimestamp() +
+                ", offset=" + getOffset() +
+                ", payload=" + new String(getPayload()) +
                 '}';
     }
 }
